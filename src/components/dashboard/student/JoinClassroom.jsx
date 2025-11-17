@@ -1,7 +1,7 @@
 // src/components/dashboard/student/JoinClassroom.jsx
 
 import React, { useEffect, useState } from "react";
-import { Loader2, DoorOpen, ClipboardList, GraduationCap } from "lucide-react";
+import { Loader2, ClipboardList, GraduationCap } from "lucide-react";
 import API from "../../../api/axiosConfig";
 
 export default function JoinClassroom({ user }) {
@@ -9,29 +9,23 @@ export default function JoinClassroom({ user }) {
   const [joined, setJoined] = useState([]);
   const [selectedClassroom, setSelectedClassroom] = useState(null);
   const [tests, setTests] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [joining, setJoining] = useState(false);
 
   useEffect(() => {
     if (user?._id) fetchJoined();
   }, [user]);
 
   async function fetchJoined() {
-    setLoading(true);
     try {
       const res = await API.get("/classrooms/student");
       setJoined(res.data || []);
     } catch (e) {
       setJoined([]);
     }
-    setLoading(false);
   }
 
   async function joinByCode(e) {
     e.preventDefault();
     if (!code.trim()) return alert("Enter a code!");
-
-    setJoining(true);
 
     try {
       await API.post("/classrooms/join", { code });
@@ -41,8 +35,6 @@ export default function JoinClassroom({ user }) {
     } catch (err) {
       alert("Join failed: " + err.message);
     }
-
-    setJoining(false);
   }
 
   async function openClassroom(c) {
@@ -56,22 +48,26 @@ export default function JoinClassroom({ user }) {
     }
   }
 
-  // ⭐ FIXED — load full question objects before starting test
-async function startTest(test) {
-  try {
-    const res = await API.get(`/testrooms/get-test/${test._id}`);
+  // ⭐ FIXED — Now testId always exists
+  async function startTest(test) {
+    if (!test?._id) {
+      alert("Test ID missing!");
+      return;
+    }
 
-    sessionStorage.setItem(
-      "current_test_questions",
-      JSON.stringify(res.data)
-    );
+    try {
+      const res = await API.get(`/testrooms/get-test/${test._id}`);
 
-    window.location.href = "/";
-  } catch (err) {
-    alert("Unable to load test questions.");
+      sessionStorage.setItem(
+        "current_test_questions",
+        JSON.stringify(res.data)
+      );
+
+      window.location.href = "/";
+    } catch (err) {
+      alert("Unable to load test questions.");
+    }
   }
-}
-
 
   return (
     <div className="bg-white p-6 mt-6 rounded-2xl shadow">
@@ -87,11 +83,10 @@ async function startTest(test) {
           placeholder="Classroom code"
         />
         <button className="bg-indigo-600 text-white px-4 py-2 rounded">
-          {joining ? <Loader2 className="animate-spin" /> : "Join"}
+          Join
         </button>
       </form>
 
-      {/* Joined Classrooms */}
       <div className="mt-4">
         <h4 className="font-semibold flex items-center gap-2">
           <ClipboardList className="w-4" /> My Classrooms ({joined.length})
@@ -117,16 +112,11 @@ async function startTest(test) {
         ))}
       </div>
 
-      {/* Tests */}
       {selectedClassroom && (
         <div className="mt-6 border-t pt-4">
           <h4 className="text-lg font-bold text-indigo-700">
             Tests in {selectedClassroom.name}
           </h4>
-
-          {tests.length === 0 && (
-            <p className="text-gray-500 mt-2">No tests assigned yet.</p>
-          )}
 
           {tests.map((t) => (
             <div
