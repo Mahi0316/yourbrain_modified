@@ -1,88 +1,110 @@
-// src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import {
+  studentLogin,
+  studentRegister,
+  teacherLogin,
+  teacherRegister,
+} from "../api/auth";
 
 interface AuthContextType {
   user: any;
+  role: "student" | "teacher" | null;
   loading: boolean;
-  signUp: (email: string, password: string, role?: string) => Promise<{ error?: any }>;
-  signIn: (email: string, password: string) => Promise<{ error?: any }>;
-  signOut: () => Promise<void>;
+  signInStudent: (email: string, password: string) => Promise<any>;
+  signInTeacher: (email: string, password: string) => Promise<any>;
+  signUpStudent: (name: string, email: string, password: string) => Promise<any>;
+  signUpTeacher: (name: string, email: string, password: string) => Promise<any>;
+  signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<any>(null);
+  const [role, setRole] = useState<"student" | "teacher" | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If supabase is stubbed, its onAuthStateChange will be a safe no-op
-    const { data } = supabase.auth.onAuthStateChange((event: any, session: any) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const savedUser = localStorage.getItem("user");
+    const savedRole = localStorage.getItem("role");
 
-    // Try to get current user (v2 style)
-    (async () => {
-      try {
-        const res = await supabase.auth.getUser?.();
-        setUser(res?.data?.user ?? null);
-      } catch (e) {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    })();
+    if (savedUser) setUser(JSON.parse(savedUser));
+    if (savedRole) setRole(savedRole as any);
 
-    return () => {
-      try {
-        data?.subscription?.unsubscribe();
-      } catch {
-        // ignore
-      }
-    };
+    setLoading(false);
   }, []);
 
-  const signUp = async (email: string, password: string, role = "student") => {
+  const signInStudent = async (email: string, password: string) => {
     try {
-      // supabase v2 signUp
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        // you can add user_metadata with role if needed: options
-      } as any);
-      if (!error) setUser(data?.user ?? null);
-      return { error };
-    } catch (error) {
-      return { error };
+      const res = await studentLogin({ email, password });
+
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+      localStorage.setItem("role", "student");
+
+      setUser(res.data.user);
+      setRole("student");
+
+      return res.data;
+    } catch (err: any) {
+      return { error: err.response?.data?.message || err.message };
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signInTeacher = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      } as any);
-      if (!error) setUser(data?.user ?? null);
-      return { error };
-    } catch (error) {
-      return { error };
+      const res = await teacherLogin({ email, password });
+
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+      localStorage.setItem("role", "teacher");
+
+      setUser(res.data.user);
+      setRole("teacher");
+
+      return res.data;
+    } catch (err: any) {
+      return { error: err.response?.data?.message || err.message };
     }
   };
 
-  const signOut = async () => {
+  const signUpStudent = async (name: string, email: string, password: string) => {
     try {
-      await supabase.auth.signOut();
-      setUser(null);
-    } catch {
-      setUser(null);
+      return (await studentRegister({ name, email, password })).data;
+    } catch (err: any) {
+      return { error: err.response?.data?.message || err.message };
     }
+  };
+
+  const signUpTeacher = async (name: string, email: string, password: string) => {
+    try {
+      return (await teacherRegister({ name, email, password })).data;
+    } catch (err: any) {
+      return { error: err.response?.data?.message || err.message };
+    }
+  };
+
+  const signOut = () => {
+    localStorage.clear();
+    setUser(null);
+    setRole(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        role,
+        loading,
+        signInStudent,
+        signInTeacher,
+        signUpStudent,
+        signUpTeacher,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

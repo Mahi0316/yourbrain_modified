@@ -5,13 +5,19 @@ import TeacherDashboard from "./components/dashboard/TeacherDashboard";
 import StudentDashboard from "./components/dashboard/StudentDashboard";
 
 const App: React.FC = () => {
-  const { user } = useAuth();
+  const { user, role, loading } = useAuth();
 
-  if (!user) return <LoginForm />;
+  if (loading) return <p>Loading...</p>;
 
-  const role = user.user_metadata?.role || user.role || (user?.role === 'teacher' ? 'teacher' : 'student');
+  // Not logged in → show login page
+  if (!user || !role) return <LoginForm />;
 
-  return role === "teacher" ? <TeacherDashboard /> : <StudentDashboard user={user} />;
+  // Logged in → load respective dashboard
+  return role === "teacher" ? (
+    <TeacherDashboard user={user} />
+  ) : (
+    <StudentDashboard user={user} />
+  );
 };
 
 export default App;
