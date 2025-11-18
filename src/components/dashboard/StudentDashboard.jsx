@@ -50,32 +50,35 @@ export default function StudentDashboard({ user }) {
   }, [user]);
 
   // 🔹 Start quiz for selected level
-  const startLevel = async (lvl) => {
-    try {
-      const res = await API.get(`/questions?level=${lvl}`);
+const startLevel = async (lvl) => {
+  setLevel(lvl);         // first update UI state immediately
+  setIndex(0);
+  setScore(0);
+  setShowResult(false);
 
-      if (res.data?.length) {
-        setFetchedQuestions(
-          res.data.map((q) => ({
-            q: q.text,
-            opts: q.options,
-            a: q.correctIndex,
-          }))
-        );
-      } else {
-        setFetchedQuestions(null);
-      }
-    } catch {
-      setFetchedQuestions(null);
+  try {
+    const res = await API.get(`/questions/level/${lvl}`);
+
+
+    if (res.data?.length > 0) {
+      setFetchedQuestions(
+        res.data.map((q) => ({
+          q: q.text,
+          opts: q.options,
+          a: q.correctIndex
+        }))
+      );
+    } else {
+      setFetchedQuestions(FALLBACK_QUESTIONS[lvl]);
     }
+  } catch {
+    setFetchedQuestions(FALLBACK_QUESTIONS[lvl]);
+  }
 
-    setLevel(lvl);
-    setIndex(0);
-    setScore(0);
-    setShowResult(false);
-    setTimeLeft(timeLimit);
-    setTimerRunning(true);
-  };
+  setTimeLeft(timeLimit);   // FIX
+  setTimerRunning(true);    // FIX
+};
+
 
   // 🔹 Timer
   useEffect(() => {
@@ -120,26 +123,30 @@ export default function StudentDashboard({ user }) {
   }
 
   // 🔹 Load assigned test (coming from JoinClassroom)
-  useEffect(() => {
-    const raw = sessionStorage.getItem("current_test_questions");
-    if (!raw) return;
+useEffect(() => {
+  const raw = sessionStorage.getItem("current_test_questions");
+  if (!raw) return;
 
-    try {
-      const parsed = JSON.parse(raw);
+  try {
+    const parsed = JSON.parse(raw);
 
-      setFetchedQuestions(parsed.questions);
-      setLevel(parsed.title);
-      setIndex(0);
-      setScore(0);
-      setTimeLimit(parsed.duration);
-      setTimeLeft(parsed.duration);
-      setTimerRunning(true);
-    } catch (err) {
-      console.warn("Failed to load assigned test", err);
-    }
+    setFetchedQuestions(parsed.questions);
+    setLevel(parsed.title);
+    setIndex(0);
+    setScore(0);
 
-    sessionStorage.removeItem("current_test_questions");
-  }, []);
+    const duration = parsed.durationSeconds ?? parsed.duration ?? 60;
+
+    setTimeLimit(duration);
+    setTimeLeft(duration);
+    setTimerRunning(true);
+  } catch (err) {
+    console.warn("Failed to load assigned test", err);
+  }
+
+  sessionStorage.removeItem("current_test_questions");
+}, []);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">

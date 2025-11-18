@@ -17,6 +17,10 @@ export default function ClassroomManager({ teacherId }) {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState(null);
 
+  const [students, setStudents] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [results, setResults] = useState([]);
+
   useEffect(() => {
     if (teacherId) fetchClassrooms();
   }, [teacherId]);
@@ -45,22 +49,25 @@ export default function ClassroomManager({ teacherId }) {
       alert("Error: " + err.message);
     }
   }
-async function openClassroom(c) {
-  setSelected(c);
-  setStudents([]);
-  setAttempts([]);
 
-  try {
-    const res = await API.get(`/classrooms/full/${c._id}`);
+  async function openClassroom(c) {
+    setSelected(c);
 
-    setStudents(res.data.students || []);
-    setAttempts(res.data.tests || []);   // tests assigned to this classroom
-  } catch (err) {
-    console.warn("Error loading classroom:", err);
+    try {
+      const res = await API.get(`/classrooms/full/${c._id}`);
+
+      setStudents(res.data.students || []);
+      setTests(res.data.tests || []);
+      setResults(res.data.results || []);
+
+    } catch (err) {
+      console.warn("Error loading classroom:", err);
+    }
   }
-}
 
-
+  function getStudentResults(studentId) {
+    return results.filter((r) => r.studentId._id === studentId);
+  }
 
   return (
     <div className="bg-white/80 p-6 rounded-2xl shadow-lg border mt-4">
@@ -79,7 +86,7 @@ async function openClassroom(c) {
         </button>
       </form>
 
-      {/* LIST */}
+      {/* CLASSROOM LIST */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         {classrooms.map((c) => (
           <div
@@ -100,7 +107,7 @@ async function openClassroom(c) {
 
             <button
               className="mt-3 text-indigo-600 hover:underline"
-              onClick={() => setSelected(c)}
+              onClick={() => openClassroom(c)}
             >
               Open →
             </button>
@@ -116,7 +123,65 @@ async function openClassroom(c) {
             Code: <b>{selected.code}</b>
           </p>
 
-          <TestManager classroom={selected} />
+          {/* STUDENTS LIST */}
+          <div className="mt-6 bg-gray-50 p-4 rounded-xl">
+            <h4 className="text-lg font-semibold">👨‍🎓 Students ({students.length})</h4>
+
+            {students.length === 0 && (
+              <p className="text-gray-500 mt-2">No students joined yet.</p>
+            )}
+
+            {students.map((s) => (
+              <div key={s._id} className="border p-3 rounded mt-2">
+                <div className="font-medium">{s.name}</div>
+                <div className="text-xs text-gray-600">{s.email}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* STUDENT PERFORMANCE */}
+          <div className="mt-6 bg-gray-50 p-4 rounded-xl">
+            <h4 className="text-lg font-semibold">📊 Performance</h4>
+
+            {students.map((s) => {
+              const myResults = getStudentResults(s._id);
+
+              return (
+                <div key={s._id} className="mt-4 border p-3 rounded-xl bg-white">
+                  <h5 className="font-semibold text-indigo-700">{s.name}</h5>
+
+                  {myResults.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No attempts yet.</p>
+                  ) : (
+                    <div className="space-y-2 mt-2">
+                      {myResults.map((r) => (
+                        <div
+                          key={r._id}
+                          className="p-3 bg-gray-50 border rounded shadow-sm"
+                        >
+                          <div className="font-medium">
+                            {r.testId?.title || "Test"}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Score: {r.score}/{r.total} (
+                            {Math.round((r.score / r.total) * 100)}%)
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(r.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* TEST MANAGER */}
+          <div className="mt-6">
+            <TestManager classroom={selected} />
+          </div>
         </div>
       )}
     </div>

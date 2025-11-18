@@ -173,23 +173,130 @@ const fetchPerformance = async () => {
 
           {tab === "questions" && <QuestionManager />}
 
-          {tab === "performance" && (
-            <>
-              <h2 className="text-xl font-bold mb-3">📊 Student Performance</h2>
+{tab === "performance" && (
+  <>
+    <h2 className="text-xl font-bold mb-3">📊 Student Performance Overview</h2>
 
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="avgScore" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </>
-          )}
+    {/* Chart */}
+    <div className="h-80 mb-10">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="name" />
+          <YAxis />
+          <Tooltip />
+          <Bar
+            dataKey="avgScore"
+            fill="#6366f1"
+            radius={[6, 6, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+
+    {/* Performance Table */}
+    <div className="overflow-x-auto">
+      <table className="min-w-full border text-sm">
+        <thead>
+          <tr className="bg-gray-100 text-left">
+            <th className="p-3 font-semibold">Student</th>
+            <th className="p-3 font-semibold">Attempts</th>
+            <th className="p-3 font-semibold">Average %</th>
+            <th className="p-3 font-semibold">Last Test</th>
+            <th className="p-3 font-semibold">View Tests</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {students.map((s, idx) => {
+            const res = results.filter((r) => r.studentId === s._id);
+
+            const avgScore =
+              res.length > 0
+                ? Math.round(
+                    res.reduce(
+                      (sum, r) => sum + (r.score / r.total) * 100,
+                      0
+                    ) / res.length
+                  )
+                : 0;
+
+            const last =
+              res.length > 0
+                ? new Date(
+                    res[res.length - 1].createdAt
+                  ).toLocaleString()
+                : "-";
+
+            return (
+              <React.Fragment key={s._id}>
+                {/* Row */}
+                <tr className="border-b hover:bg-gray-50">
+                  <td className="p-3 font-medium">{chartData[idx].name}</td>
+                  <td className="p-3">{res.length}</td>
+                  <td className="p-3">{avgScore}%</td>
+                  <td className="p-3">{last}</td>
+                  <td className="p-3">
+                    <button
+                      onClick={() =>
+                        setStudents((prev) =>
+                          prev.map((x) =>
+                            x._id === s._id
+                              ? { ...x, showTests: !x.showTests }
+                              : x
+                          )
+                        )
+                      }
+                      className="text-indigo-600 hover:underline"
+                    >
+                      {s.showTests ? "Hide" : "View"}
+                    </button>
+                  </td>
+                </tr>
+
+                {/* Test-wise Details */}
+                {s.showTests && (
+                  <tr className="bg-gray-50 border-b">
+                    <td colSpan={5} className="p-4">
+                      {res.length === 0 ? (
+                        <p className="text-gray-500">No tests attempted.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {res.map((attempt) => (
+                            <div
+                              key={attempt._id}
+                              className="p-3 bg-white border rounded-xl shadow-sm"
+                            >
+                              <div className="font-semibold">
+                                {attempt.testTitle || attempt.testId?.title}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                Score: {attempt.score}/{attempt.total} (
+                                {Math.round(
+                                  (attempt.score / attempt.total) * 100
+                                )}
+                                %)
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Attempted on:{" "}
+                                {new Date(attempt.createdAt).toLocaleString()}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </>
+)}
+
         </div>
       </main>
     </div>

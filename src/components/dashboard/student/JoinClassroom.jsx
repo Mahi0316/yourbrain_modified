@@ -49,25 +49,32 @@ export default function JoinClassroom({ user }) {
   }
 
   // ⭐ FIXED — Now testId always exists
-  async function startTest(test) {
-    if (!test?._id) {
-      alert("Test ID missing!");
-      return;
-    }
-
-    try {
-      const res = await API.get(`/testrooms/get-test/${test._id}`);
-
-      sessionStorage.setItem(
-        "current_test_questions",
-        JSON.stringify(res.data)
-      );
-
-      window.location.href = "/";
-    } catch (err) {
-      alert("Unable to load test questions.");
-    }
+async function startTest(test) {
+  if (!test?._id) {
+    alert("Test ID missing!");
+    return;
   }
+
+  try {
+    const res = await API.get(`/testrooms/get-test/${test._id}`);
+
+    sessionStorage.setItem(
+      "assigned_test",
+      JSON.stringify({
+        testId: test._id,
+        classroomId: selectedClassroom._id,
+        title: test.title,
+        duration: test.durationSeconds,
+        questions: res.data.questions, // contains _id, q, opts, a
+      })
+    );
+
+    window.location.href = "/student-test";
+  } catch (err) {
+    alert("Unable to load test questions.");
+  }
+}
+
 
   return (
     <div className="bg-white p-6 mt-6 rounded-2xl shadow">
