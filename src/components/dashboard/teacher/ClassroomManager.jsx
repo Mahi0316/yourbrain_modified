@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import TestManager from "./TestManager";
 import { ClipboardCopy } from "lucide-react";
 import API from "../../../api/axiosConfig";
+import PerformanceGraph from "./PerformanceGraph";
 
 function genCode(len = 7) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -55,13 +56,35 @@ export default function ClassroomManager({ teacherId }) {
 
     try {
       const res = await API.get(`/classrooms/full/${c._id}`);
+      const resultRes = await API.get(`/classrooms/results/${c._id}`);
 
       setStudents(res.data.students || []);
       setTests(res.data.tests || []);
-      setResults(res.data.results || []);
-
+      setResults(resultRes.data || []);
     } catch (err) {
       console.warn("Error loading classroom:", err);
+    }
+  }
+
+  // 🔹 DELETE CLASSROOM
+  async function deleteClassroom(id) {
+    if (!confirm("Are you sure you want to delete this classroom?")) return;
+
+    try {
+      await API.delete(`/classrooms/${id}`);
+
+      alert("Classroom deleted successfully.");
+
+      if (selected && selected._id === id) {
+        setSelected(null);
+      }
+
+      fetchClassrooms();
+    } catch (err) {
+      alert(
+        "Error deleting classroom: " +
+          (err.response?.data?.message || err.message)
+      );
     }
   }
 
@@ -111,6 +134,13 @@ export default function ClassroomManager({ teacherId }) {
             >
               Open →
             </button>
+
+            <button
+              className="mt-2 text-red-600 hover:underline"
+              onClick={() => deleteClassroom(c._id)}
+            >
+              Delete Classroom
+            </button>
           </div>
         ))}
       </div>
@@ -125,14 +155,16 @@ export default function ClassroomManager({ teacherId }) {
 
           {/* STUDENTS LIST */}
           <div className="mt-6 bg-gray-50 p-4 rounded-xl">
-            <h4 className="text-lg font-semibold">👨‍🎓 Students ({students.length})</h4>
+            <h4 className="text-lg font-semibold">
+              👨‍🎓 Students ({students.length})
+            </h4>
 
             {students.length === 0 && (
               <p className="text-gray-500 mt-2">No students joined yet.</p>
             )}
 
             {students.map((s) => (
-              <div key={s._id} className="border p-3 rounded mt-2">
+              <div key={s._id} className="border p-3 rounded mt-2 bg-white">
                 <div className="font-medium">{s.name}</div>
                 <div className="text-xs text-gray-600">{s.email}</div>
               </div>
@@ -147,31 +179,40 @@ export default function ClassroomManager({ teacherId }) {
               const myResults = getStudentResults(s._id);
 
               return (
-                <div key={s._id} className="mt-4 border p-3 rounded-xl bg-white">
+                <div
+                  key={s._id}
+                  className="mt-4 border p-3 rounded-xl bg-white"
+                >
                   <h5 className="font-semibold text-indigo-700">{s.name}</h5>
 
                   {myResults.length === 0 ? (
                     <p className="text-gray-500 text-sm">No attempts yet.</p>
                   ) : (
-                    <div className="space-y-2 mt-2">
-                      {myResults.map((r) => (
-                        <div
-                          key={r._id}
-                          className="p-3 bg-gray-50 border rounded shadow-sm"
-                        >
-                          <div className="font-medium">
-                            {r.testId?.title || "Test"}
+                    <>
+                      {/* LIST OF ATTEMPTS */}
+                      <div className="space-y-2 mt-2">
+                        {myResults.map((r) => (
+                          <div
+                            key={r._id}
+                            className="p-3 bg-gray-50 border rounded shadow-sm"
+                          >
+                            <div className="font-medium">
+                              {r.testId?.title || "Test"}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Score: {r.score}/{r.total} (
+                              {Math.round((r.score / r.total) * 100)}%)
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {new Date(r.createdAt).toLocaleString()}
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-600">
-                            Score: {r.score}/{r.total} (
-                            {Math.round((r.score / r.total) * 100)}%)
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {new Date(r.createdAt).toLocaleString()}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+
+                      {/* 📈 PERFORMANCE GRAPH */}
+                      <PerformanceGraph results={myResults} />
+                    </>
                   )}
                 </div>
               );

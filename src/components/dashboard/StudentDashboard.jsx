@@ -31,7 +31,10 @@ export default function StudentDashboard({ user }) {
   const [timeLimit, setTimeLimit] = useState(60);
   const [timeLeft, setTimeLeft] = useState(null);
   const [timerRunning, setTimerRunning] = useState(false);
+
   const [recentResults, setRecentResults] = useState([]);
+  const [myClassrooms, setMyClassrooms] = useState([]);
+  const [isClassroomTest, setIsClassroomTest] = useState(false);
 
   // 🔹 Load student's real results
   useEffect(() => {
@@ -49,38 +52,52 @@ export default function StudentDashboard({ user }) {
     loadResults();
   }, [user]);
 
-  // 🔹 Start quiz for selected level
-const startLevel = async (lvl) => {
-  setLevel(lvl);         // first update UI state immediately
-  setIndex(0);
-  setScore(0);
-  setShowResult(false);
+  // 🔹 Load joined classrooms
+  useEffect(() => {
+    if (!user?._id) return;
 
-  try {
-    const res = await API.get(`/questions/level/${lvl}`);
+    async function loadMyClasses() {
+      try {
+        const res = await API.get("/classrooms/my-classrooms");
+        setMyClassrooms(res.data || []);
+      } catch (err) {
+        console.warn("Error loading joined classrooms", err);
+      }
+    }
 
+    loadMyClasses();
+  }, [user]);
 
-    if (res.data?.length > 0) {
-      setFetchedQuestions(
-        res.data.map((q) => ({
-          q: q.text,
-          opts: q.options,
-          a: q.correctIndex
-        }))
-      );
-    } else {
+  // 🔹 Start quiz for selected level (practice mode)
+  const startLevel = async (lvl) => {
+    setLevel(lvl);
+    setIndex(0);
+    setScore(0);
+    setShowResult(false);
+
+    try {
+      const res = await API.get(`/students/aptitude/${lvl}`);
+
+      if (res.data?.length > 0) {
+        setFetchedQuestions(
+          res.data.map((q) => ({
+            q: q.text,
+            opts: q.options,
+            a: q.correctIndex,
+          }))
+        );
+      } else {
+        setFetchedQuestions(FALLBACK_QUESTIONS[lvl]);
+      }
+    } catch {
       setFetchedQuestions(FALLBACK_QUESTIONS[lvl]);
     }
-  } catch {
-    setFetchedQuestions(FALLBACK_QUESTIONS[lvl]);
-  }
 
-  setTimeLeft(timeLimit);   // FIX
-  setTimerRunning(true);    // FIX
-};
+    setTimeLeft(timeLimit);
+    setTimerRunning(true);
+  };
 
-
-  // 🔹 Timer
+  // 🔹 Timer effect
   useEffect(() => {
     if (!timerRunning || timeLeft === null) return;
 
@@ -122,31 +139,31 @@ const startLevel = async (lvl) => {
     }
   }
 
-  // 🔹 Load assigned test (coming from JoinClassroom)
-useEffect(() => {
-  const raw = sessionStorage.getItem("current_test_questions");
-  if (!raw) return;
+  // 🔹 Load assigned test from teacher
+  useEffect(() => {
+    const raw = sessionStorage.getItem("current_test_questions");
+    if (!raw) return;
 
-  try {
-    const parsed = JSON.parse(raw);
+    try {
+      const parsed = JSON.parse(raw);
 
-    setFetchedQuestions(parsed.questions);
-    setLevel(parsed.title);
-    setIndex(0);
-    setScore(0);
+      setFetchedQuestions(parsed.questions);
+      setLevel(parsed.title);
+      setIndex(0);
+      setScore(0);
 
-    const duration = parsed.durationSeconds ?? parsed.duration ?? 60;
+      const duration = parsed.durationSeconds ?? parsed.duration ?? 60;
+      setTimeLimit(duration);
+      setTimeLeft(duration);
+      setTimerRunning(true);
 
-    setTimeLimit(duration);
-    setTimeLeft(duration);
-    setTimerRunning(true);
-  } catch (err) {
-    console.warn("Failed to load assigned test", err);
-  }
+      setIsClassroomTest(true);
+    } catch (err) {
+      console.warn("Failed to load assigned test", err);
+    }
 
-  sessionStorage.removeItem("current_test_questions");
-}, []);
-
+    sessionStorage.removeItem("current_test_questions");
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -154,7 +171,6 @@ useEffect(() => {
 
       <main className="max-w-5xl mx-auto p-6">
         <div className="flex flex-col md:flex-row md:gap-6">
-
           {/* LEFT SIDEBAR */}
           <div className="md:w-1/3">
             {/* Greeting */}
@@ -169,6 +185,49 @@ useEffect(() => {
 
             <JoinClassroom user={user} />
 
+            {/* Joined Classrooms */}
+            <div className="bg-white rounded-2xl shadow-md mt-6 p-5">
+              <h3 className="text-lg font-semibold mb-3">📚 Joined Classrooms</h3>
+
+              {myClassrooms.length === 0 ? (
+                <p className="text-sm text-gray-500">No classrooms joined.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {myClassrooms.map((c) => (
+                    <li
+                      key={c._id}
+                      className="p-3 bg-gray-50 rounded-xl border flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-semibold text-gray-700">{c.name}</div>
+                        <div className="text-gray-500 text-xs">Code: {c.code}</div>
+                      </div>
+
+                      <button
+                        className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600"
+                        onClick={async () => {
+                          if (!confirm("Leave this classroom?")) return;
+
+                          try {
+                            await API.post("/students/leave-classroom", {
+                              classroomId: c._id,
+                            });
+
+                            alert("Left classroom!");
+                            setMyClassrooms(myClassrooms.filter((x) => x._id !== c._id));
+                          } catch (err) {
+                            alert("Error leaving classroom");
+                          }
+                        }}
+                      >
+                        Leave
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             {/* Recent results */}
             <div className="bg-white rounded-2xl shadow-md mt-6 p-5">
               <h3 className="text-lg font-semibold flex items-center mb-3">
@@ -177,16 +236,38 @@ useEffect(() => {
               </h3>
 
               {recentResults.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  No results yet.
-                </p>
+                <p className="text-sm text-gray-500">No results yet.</p>
               ) : (
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-3 text-sm">
                   {recentResults.map((r) => (
-                    <li key={r._id} className="p-2 bg-gray-50 rounded-lg flex justify-between">
-                      <span>{r.level}</span>
-                      <span className="font-semibold text-indigo-600">
-                        {r.score}/{r.total}
+                    <li
+                      key={r._id}
+                      className="p-3 bg-gray-50 rounded-lg border flex flex-col"
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-gray-800">
+                          {r.level && (
+                            <span className="capitalize">Aptitude – {r.level}</span>
+                          )}
+
+                          {!r.level && r.testId?.title && (
+                            <span>{r.testId.title}</span>
+                          )}
+                        </span>
+
+                        <span className="font-bold text-indigo-600">
+                          {r.score}/{r.total}
+                        </span>
+                      </div>
+
+                      {!r.level && r.classroomId?.name && (
+                        <span className="text-gray-500 text-xs mt-1">
+                          Classroom: {r.classroomId.name}
+                        </span>
+                      )}
+
+                      <span className="text-gray-400 text-xs mt-1">
+                        {new Date(r.createdAt).toLocaleString()}
                       </span>
                     </li>
                   ))}
@@ -197,7 +278,6 @@ useEffect(() => {
 
           {/* RIGHT SECTION → QUIZ */}
           <section className="flex-1 bg-white rounded-2xl p-6 shadow-lg">
-
             {/* Level Selector */}
             {!level && !showResult && (
               <>
@@ -266,17 +346,17 @@ useEffect(() => {
                   </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(fetchedQuestions || FALLBACK_QUESTIONS[level])[index].opts.map(
-                      (opt, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleAnswer(i)}
-                          className="p-3 border rounded-lg bg-white hover:bg-indigo-50 text-left"
-                        >
-                          {String.fromCharCode(65 + i)}. {opt}
-                        </button>
-                      )
-                    )}
+                    {(fetchedQuestions || FALLBACK_QUESTIONS[level])[
+                      index
+                    ].opts.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleAnswer(i)}
+                        className="p-3 border rounded-lg bg-white hover:bg-indigo-50 text-left"
+                      >
+                        {String.fromCharCode(65 + i)}. {opt}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -307,8 +387,15 @@ useEffect(() => {
                   <button
                     className="flex items-center gap-2 border px-6 py-2 rounded-lg text-gray-600"
                     onClick={() => {
-                      setLevel(null);
-                      setShowResult(false);
+                      if (isClassroomTest) {
+                        setIsClassroomTest(false);
+                        setFetchedQuestions(null);
+                        setLevel(null);
+                        setShowResult(false);
+                      } else {
+                        setLevel(null);
+                        setShowResult(false);
+                      }
                     }}
                   >
                     <ArrowLeftCircle className="w-4 h-4" /> Back

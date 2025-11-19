@@ -1,3 +1,5 @@
+// src/components/dashboard/student/StudentTest.jsx
+
 import React, { useState, useEffect } from "react";
 import API from "../../../api/axiosConfig";
 
@@ -53,8 +55,6 @@ export default function StudentTest() {
         classroomId: test.classroomId,
         answers: answerArray,
       });
-
-      alert("Test Submitted!");
     } catch (err) {
       console.log(err);
       alert("Error submitting test.");
@@ -63,8 +63,23 @@ export default function StudentTest() {
     sessionStorage.removeItem("assigned_test");
   }
 
-  if (!test) return <p>Loading...</p>;
-  if (finished) return <h2 className="text-center mt-20">Test Submitted!</h2>;
+  if (!test) return <p className="text-center mt-20">Loading...</p>;
+
+  // ⭐⭐ UPDATED FINISHED SCREEN (WITH BACK BUTTON)
+  if (finished)
+    return (
+      <div className="text-center py-20">
+        <h2 className="text-3xl font-bold mb-6 text-indigo-700">Test Submitted!</h2>
+
+<button
+  className="px-6 py-3 bg-indigo-600 text-white rounded-xl shadow hover:bg-indigo-700 transition"
+  onClick={() => (window.location.href = "/")}
+>
+  ← Back to Dashboard
+</button>
+
+      </div>
+    );
 
   const q = test.questions[index];
 
